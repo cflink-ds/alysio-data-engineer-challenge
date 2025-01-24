@@ -1,0 +1,14 @@
+# Ignore Local VSCODE settings
+.vscode/
+
+# Pycache when code is ran
+**__pycache__**
+
+# Ignore any venv from any of the project folder
+**/venv/
+
+# Ignore info.log
+info.log
+
+# Ignore error.log
+error.log

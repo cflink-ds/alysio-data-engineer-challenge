@@ -1,0 +1,37 @@
+Normalization
+    - the following tables: companies, contacts, opportunities, and activities are separate tables to avoid duplication
+    - relationships between tables are established through foreign keys
+
+Primary keys
+    - each table uses the id column, which is unique, as the primary key to ensure each record is uniquely identified
+
+Relationship between tables
+    - The following tables are a 'One-to-Many' Relationship
+        -- companies ---> contacts: A company can have multiple contacts
+        -- companies ---> opportunities: A company can have multiple opportunities
+        -- contacts ---> activities: A contact can have multiple activities.
+
+Constraints
+    - Unique Constraints
+        -- companies.name and companies.domain: Prevent duplicate companies
+        -- contacts.email and contacts.phone: Ensure unique contact details
+    - Foreign Key Constraints
+        -- Ensure referential integrity between related tables
+        -- Example: Deleting a company or contact will cascade to delete associated opportunities
+
+Indexes
+    - Indexed Fields include:
+        -- companies.id
+        -- contacts.id
+        -- opportunities.id
+        -- activities.id
+        -- all the above are automatically indexed as primary keys
+
+Data Types
+    - TEXT : used for fields like: name, domain, and email
+    - BOOLEAN : used for binary fields like: is_customer
+    - REAL : used for numeric fields like: annual_revenue and opportunity.value
+    - DATETIME and DATE : used for timestamps and dates
+
+Handling Missing Data
+    - Nullable fields such as: phone, title, outcome will accomodate incomplete data without compromising the integrity of relationships
