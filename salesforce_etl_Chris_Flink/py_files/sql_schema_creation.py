@@ -1,3 +1,7 @@
+"""
+The sql_schema_creation.py houses the create_schema function that will load the SQLite database with the tables found in the config/schema/init.sql file.
+"""
+
 import sqlite3
 
 def create_schema(db_path, schema):

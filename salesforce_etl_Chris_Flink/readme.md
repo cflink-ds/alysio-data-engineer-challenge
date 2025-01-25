@@ -22,9 +22,10 @@ This document provides a comprehensive overview of the Salesforce Data Pipeline,
   - **`normalize_phone_numbers` and `normalize_email_addresses`**: Standardizes contact information.
   - **`remove_duplicate_contacts`**: Deduplicates contacts while preserving relationships.
 
-### 3. **Schema Creation (`sql_schema_creation.py`)**
-- Generates the SQLite schema based on predefined structure.
+### 3. **Schema Creation (`sql_schema_creation.py`, `config\schema\init.sql`, and `config\schema\schema_design_decisions.txt`)**
+- Generates the SQLite schema based on predefined structure in the init.sql file.
 - Ensures relational integrity, indexes, and constraints are in place for performance and integrity.
+- Schema Design Decisions are found in the schema_design_decisions.txt file.
 
 ### 4. **ETL Execution (`run.py`)**
 - The main script to orchestrate the entire pipeline.
