@@ -1,4 +1,18 @@
 {
-    "db_path" : "alysio-data-engineer-challenge/Salesforce.db",
-    
+    "data_source_path" : "data/salesforce/",
+    "data_source_files" : {
+        "activities" : "activities.json",
+        "companies" : "companies.csv",
+        "contacts" : "contacts.json",
+        "opportunities" : "opportunities.csv"
+    },
+    "activities_textCols" : ["type","outcome"],
+    "companies_textCols" : ["name","industry"],
+    "contacts_textCols" : ["first_name","last_name","title","status"],
+    "opportunities_textCols" : ["stage","product","forecast_category"],
+    "activities_dateCols" : ["timestamp"],
+    "companies_dateCols" : ["created_date"],
+    "contacts_dateCols" : ["created_date","last_modified"],
+    "opportunities_dateCols" : ["created_date","close_date"],
+    "table_names" : ["activities","companies","contacts","opportunities"]
 }

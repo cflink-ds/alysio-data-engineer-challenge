@@ -3,15 +3,15 @@ The config_json.py houses the ConfigJSON class and load_config function that loa
 """
 
 import json
-import os
 from pipeline_logging import logger
 
 class ConfigJSON:
-    def __init__(self):
+    def __init__(self, config_path):
+        self.config_path = config_path
         self.config = self.load_config()
 
-    def load_config(self, config_path):
-        config_file = f'{config_path}/salesforce_config.json'
+    def load_config(self):
+        config_file = f'{self.config_path}/salesforce_config.json'
         try:
             with open(config_file, 'r') as file:
                 return json.load(file)

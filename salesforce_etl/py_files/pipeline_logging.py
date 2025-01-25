@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).parent.parent.absolute()
 LOGS_DIR = Path(__file__).parent.parent.absolute() / 'runtime_logs'
+DB_PATH = Path(__file__).parent.parent.absolute() / 'database' / 'SalesforceData.db'
 PCKG_NAME = os.path.basename(ROOT_DIR)
 
 logging_config = {

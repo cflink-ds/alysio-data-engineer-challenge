@@ -3,30 +3,27 @@ Purpose: This script is used to run the ETL process for Salesforce data.
 
 Revisions: 01/23/2025 C Flink - Initial version
 """
-from pipeline_logging import logger
+from pipeline_logging import logger, DB_PATH
 
 ## Try all import and log failures
 try:
-    import sys
-    import pandas as pd
     import sqlite3
-    import os
-    import numpy as np
-    import json
-    from sql_schema_creation import create_schema
-    from pathlib import Path
+    import sys
+    from config_json import ConfigJSON
+    from data import DataLoader
+    from pathlib import Path  
     logger.info('All imports successful.')
 except ImportError as e:
     logger.error(f'Import error: {e}')
     sys.exit(1)
 
-""" ## Uncomment the following code block and run the script to create the tables in the SalesforceData.db database
+## Uncomment the following code block and run the script to create the tables in the SalesforceData.db database
 try:
-    # Obtain db file path
-    db_path = Path(__file__).parent.parent.parent.absolute() / 'SalesforceData.db'
+    # Import create_schema function
+    from sql_schema_creation import create_schema
 
     # Obtain schema file path
-    schema_path = Path(__file__).parent.parent.parent.absolute() / 'schema' / 'init.sql'
+    schema_path = Path(__file__).parent.parent.absolute() / 'config' / 'schema' / 'init.sql'
 
     # Get init.sql schema
     with open(schema_path, 'r') as file:
@@ -37,16 +34,163 @@ except Exception as e:
     sys.exit(1)
 
 try:
-    create_schema(db_path=db_path, schema=schema)
+    create_schema(db_path=DB_PATH, schema=schema)
     logger.info('Schema created successfully.')
 except Exception as e:
     logger.error(f'Error creating schema: {e}')
-    sys.exit(1) """
+    sys.exit(1)
 
 def main() -> int:
-    config_path = Path(__file__).parent.parent.absolute() / 'config'
+    error_message : str = ''
+    try:
+        config_path = Path(__file__).parent.parent.absolute() / 'config'
+        config_file = ConfigJSON(config_path)
+        cfg_data_path : str = config_file.get('data_source_path')
+        cfg_data_files : dict = config_file.get('data_source_files')
+        cfg_act_txt_cols : list = config_file.get('activities_textCols')
+        cfg_act_dt_cols : list = config_file.get('activities_dateCols')
+        cfg_comp_txt_cols : list = config_file.get('companies_textCols')
+        cfg_comp_dt_cols : list = config_file.get('companies_dateCols')
+        cfg_cont_txt_cols : list = config_file.get('contacts_textCols')
+        cfg_cont_dt_cols : list = config_file.get('contacts_dateCols')
+        cfg_opps_txt_cols : list = config_file.get('opportunities_textCols')
+        cfg_opps_dt_cols : list = config_file.get('opportunities_dateCols')
+        cfg_tbl_names : list = config_file.get('table_names')
+        logger.info('ConfigJSON read config_file without error.')
+    except Exception as e:
+        error_message = f'Cannot initialize JSON configuration: {e}'
+        return 1, 'error', error_message
+    
+    try:
+        data_loader = DataLoader(conn = sqlite3.connect(DB_PATH))
+        logger.info('SQLite connection successful.')
+    except Exception as e:
+        error_message = f'Cannot connect to SQLite database: {e}'
+        return 1, 'error', error_message
+    
+    try:
+        listFileName = []
+        listFile = []
+        listFileExtensions = []
+        file_listMapping = cfg_data_files
 
-##TODO: Add code to read the config file, get data from sources into DF's, do next part of requirements
+        for key, value in file_listMapping.items():
+            listFileName.append(key)
+            listFile.append(value)
+            listFileExtensions.append(value.split('.')[-1])        
+
+    except Exception as e:
+        error_message = f'Cannot get list of files: {e}'
+        return 1, 'error', error_message
+        
+    try:
+        dfs = {}
+        for i in range(len(listFileName)):
+            file_name = listFileName[i]
+            file_path = cfg_data_path + listFile[i]
+            file_extension = listFileExtensions[i]
+            df = data_loader.source_to_df(file_path, file_extension)
+            df_name = f'df_{file_name}'
+            dfs[df_name] = df
+            logger.info(f'DataFrame created for {listFileName[i]}.')
+        df_activities = dfs['df_activities']
+        df_companies = dfs['df_companies']
+        df_contacts = dfs['df_contacts']
+        df_opportunities = dfs['df_opportunities']
+    except Exception as e:
+        error_message = f'Cannot create DataFrames: {e}'
+        return 1, 'error', error_message
+
+    try:
+        df_activities = data_loader.standardize_text_cols(df=df_activities, text_cols=cfg_act_txt_cols)
+        df_activities = data_loader.standardize_date_cols(df=df_activities, date_cols=cfg_act_dt_cols)
+        logger.info('Activities DF standardized.')
+    except Exception as e:
+        error_message = f'Cannot standardize activities DataFrame: {e}'
+        return 1, 'error', error_message
+
+    try:
+        df_companies = data_loader.standardize_text_cols(df=df_companies, text_cols=cfg_comp_txt_cols)
+        df_companies = data_loader.standardize_date_cols(df=df_companies, date_cols=cfg_comp_dt_cols)
+        logger.info('Activities DF standardized.')
+    except Exception as e:
+        error_message = f'Cannot standardize activities DataFrame: {e}'
+        return 1, 'error', error_message
+    
+    try:
+        df_contacts = data_loader.standardize_text_cols(df=df_contacts, text_cols=cfg_cont_txt_cols)
+        df_contacts = data_loader.standardize_date_cols(df=df_contacts, date_cols=cfg_cont_dt_cols)
+        logger.info('Activities DF standardized.')
+    except Exception as e:
+        error_message = f'Cannot standardize activities DataFrame: {e}'
+        return 1, 'error', error_message
+    
+    try:
+        df_opportunities = data_loader.standardize_text_cols(df=df_opportunities, text_cols=cfg_opps_txt_cols)
+        df_opportunities = data_loader.standardize_date_cols(df=df_opportunities, date_cols=cfg_opps_dt_cols)
+        logger.info('Activities DF standardized.')
+    except Exception as e:
+        error_message = f'Cannot standardize activities DataFrame: {e}'
+        return 1, 'error', error_message
+
+    try:
+        df_contacts['phone'] = data_loader.normalize_phone_numbers(df_contacts['phone'])
+        logger.info('Phone numbers normalized.')
+    except Exception as e:
+        error_message = f'Cannot normalize phone numbers: {e}'
+        return 1, 'error', error_message
+    
+    try:
+        df_contacts['email'] = data_loader.normalize_email_addresses(df_contacts['email'])
+        logger.info('Email addresses normalized.')
+    except Exception as e:
+        error_message = f'Cannot normalize email addresses: {e}'
+        return 1, 'error', error_message
+
+    try:
+        df_contacts, df_activities, df_opportunities = data_loader.remove_duplicate_contacts(contacts_df=df_contacts,
+                                                                                             activities_df=df_activities,
+                                                                                             opportunities_df=df_opportunities)        
+    except Exception as e:
+        error_message = f'Cannot remove duplicate contacts: {e}'
+        return 1, 'error', error_message
+
+    try:
+        df_activities = data_loader.find_oppID_for_act_null(df_activities, df_opportunities)
+        logger.info('Opportunity IDs added to df_activities.')
+    except Exception as e:
+        error_message = f'Cannot add Opportunity IDs to Activities: {e}'
+        return 1, 'error', error_message
+    
+    try:
+        invalid_date_ranges = data_loader.validate_opportunity_dates(df_opportunities)
+        if len(invalid_date_ranges) == 0:
+            logger.info('Opportunity dates validated.')
+        else:
+            error_message = 'Opportunity dates are Invalid'
+            return 1, 'error', error_message
+    except Exception as e:
+        error_message = f'Cannot validate opportunity dates: {e}'
+        return 1, 'error', error_message
+
+    try:
+        data_loader.truncate_sqlite_tables(cfg_tbl_names)
+    except Exception as e:
+        error_message = f'Cannot truncate tables: {e}'
+        return 1, 'error', error_message
+
+    try:
+        tbl_data = {'activities': df_activities,
+                    'companies': df_companies,
+                    'contacts': df_contacts,
+                    'opportunities': df_opportunities}
+        data_loader.load_df_to_sqlite(tbl_data)
+    except Exception as e:
+        error_message = f'Cannot load DataFrames to SQLite: {e}'
+        return 1, 'error', error_message
+    
+    data_loader.close_conn()
+    return 0, 'info', 'ETL process completed successfully.'
 
 if __name__ == "__main__":
     status, log_type, message = main()
