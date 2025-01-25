@@ -14,5 +14,9 @@
     "companies_dateCols" : ["created_date"],
     "contacts_dateCols" : ["created_date","last_modified"],
     "opportunities_dateCols" : ["created_date","close_date"],
-    "table_names" : ["activities","companies","contacts","opportunities"]
+    "table_names" : ["activities","companies","contacts","opportunities"],
+    "activities_cols" : ["id","contact_id","opportunity_id","type","subject","timestamp","duration_minutes","outcome","notes"],
+    "companies_cols" : ["id","name","domain","industry","size","country","created_date","is_customer","annual_revenue"],
+    "contacts_cols" : ["id","first_name","last_name","email","phone","title","status","company_id","created_date","last_modified"],
+    "opportunities_cols" : ["id","name","contact_id","company_id","amount","stage","product","probability","created_date","close_date","is_closed","forecast_category"]
 }

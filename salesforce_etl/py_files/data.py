@@ -22,7 +22,6 @@ class DataLoader:
         Validates the mapping of column names in a SQLite database.
 
         Args:
-            conn (sqlite3.connect): The connection to the SQLite database.
             import_table (str): The name of the table in the database.
             mapping_keys (List[str]): The list of column names as expected in the database.
 
@@ -43,27 +42,31 @@ class DataLoader:
                 logger.info('SQLite mapping is valid.')
                 return True
 
-    def validate_csv_data_mapping(self, found_colnames: List[str], expected_mapping_values: List[str]) -> List[int] | bool:
+    def validate_source_data_mapping(self, found_colnames: List[str], expected_mapping_values: List[str]) -> List[int] | bool:
         """
         Validates the mapping of column names in a file.
 
         Args:
-            found_colnames (list[str]): The list of column names found in the source csv file.
-            expected_mapping_values (list[str]): The list of column names as expected in the source file.
+            found_colnames (list[str]): The list of column names found in the source.
+            expected_mapping_values (list[str]): The list of column names as expected in the source.
 
         Returns:
             list[int] | bool: If the mapping is valid, returns a list of indices of the columns.
             If the mapping is invalid, returns False.
         """
-        if not set(expected_mapping_values).issubset(set(found_colnames)):
-            logger.error('Column names do not match expected values.')
-            return False
+        try:
+            if not set(expected_mapping_values).issubset(set(found_colnames)):
+                logger.error('Column names do not match expected values.')
+                return False
 
-        # Get the column_intersection of colnames
-        column_intersection = [colname for colname in found_colnames if colname in expected_mapping_values]
-        # Get the order of the columns in column_intersecion (used to reorder columns on import to match cfg_column_mapping)
-        csv_column_order = [found_colnames.index(colname) for colname in column_intersection]
-        return csv_column_order
+            # Get the column_intersection of colnames
+            column_intersection = [colname for colname in found_colnames if colname in expected_mapping_values]
+            # Get the order of the columns in column_intersecion (used to reorder columns on import to match cfg_column_mapping)
+            csv_column_order = [found_colnames.index(colname) for colname in column_intersection]
+            return csv_column_order
+        except Exception as e:
+            logger.error(f'Error validating csv data mapping: {e}')
+            raise e
 
     def source_to_df(self, file_path: str, file_extension: str, **kwargs) -> pd.DataFrame:
         """
@@ -141,19 +144,23 @@ class DataLoader:
         Returns:
             pd.Series: Normalized phone numbers.
         """
-        def format_phone(phone):
-            if pd.isnull(phone):
-                return phone
-            # Remove all non-numeric characters except "+"
-            digits = re.sub(r"[^\d+]", "", phone)
-            # Standardize to +1-XXX-XXX-XXXX if it starts with a country code or add default country code
-            if digits.startswith("+"):
-                return re.sub(r"(\+\d{1})(\d{3})(\d{3})(\d{4})", r"\1-\2-\3-\4", digits)
-            elif len(digits) == 10: # Assume default country code +1 for 10-digit numbers
-                return "+1-" + re.sub(r"(\d{3})(\d{3})(\d{4})", r"\1-\2-\3", digits)
-            return phone # Return as is if formatting fails
-        
-        return phone_column.apply(format_phone)
+        try:
+            def format_phone(phone):
+                if pd.isnull(phone):
+                    return phone
+                # Remove all non-numeric characters except "+"
+                digits = re.sub(r"[^\d+]", "", phone)
+                # Standardize to +1-XXX-XXX-XXXX if it starts with a country code or add default country code
+                if digits.startswith("+"):
+                    return re.sub(r"(\+\d{1})(\d{3})(\d{3})(\d{4})", r"\1-\2-\3-\4", digits)
+                elif len(digits) == 10: # Assume default country code +1 for 10-digit numbers
+                    return "+1-" + re.sub(r"(\d{3})(\d{3})(\d{4})", r"\1-\2-\3", digits)
+                return phone # Return as is if formatting fails
+            
+            return phone_column.apply(format_phone)
+        except Exception as e:
+            logger.error(f'Error normalizing phone numbers: {e}')
+            raise e
 
     def normalize_email_addresses(self, email_column):
         """
@@ -165,7 +172,11 @@ class DataLoader:
         Returns:
             pd.Series: Normalized email addresses.
         """
-        return email_column.str.strip().str.lower()
+        try:
+            return email_column.str.strip().str.lower()
+        except Exception as e:
+            logger.error(f'Error normalizing email addresses: {e}')
+            raise e
         
     def remove_duplicate_contacts(self, contacts_df, activities_df, opportunities_df):
         """
@@ -261,14 +272,18 @@ class DataLoader:
         Returns:
             pd.DataFrame: A DataFrame containing invalid rows where `created_date` > `close_date`.
         """
-        # Ensure the dates are in datetime format
-        opportunities_df['created_date'] = pd.to_datetime(opportunities_df['created_date'])
-        opportunities_df['close_date'] = pd.to_datetime(opportunities_df['close_date'])
+        try:
+            # Ensure the dates are in datetime format
+            opportunities_df['created_date'] = pd.to_datetime(opportunities_df['created_date'])
+            opportunities_df['close_date'] = pd.to_datetime(opportunities_df['close_date'])
 
-        # Filter rows where created_date comes after close_date
-        invalid_rows = opportunities_df[opportunities_df['created_date'] > opportunities_df['close_date']]
+            # Filter rows where created_date comes after close_date
+            invalid_rows = opportunities_df[opportunities_df['created_date'] > opportunities_df['close_date']]
 
-        return invalid_rows
+            return invalid_rows
+        except Exception as e:
+            logger.error(f'Error validating opportunity dates: {e}')
+            raise e
     
     def truncate_sqlite_tables(self, table_names: List[str]):
         """
@@ -308,6 +323,47 @@ class DataLoader:
                     logger.error(f"Error: The value for table '{table_name}' is not a DataFrame.")
         except Exception as e:
             logger.error(f"An error occurred: {e}")
+            raise e
+    
+    def incremental_update(self, new_data : pd.DataFrame, table_name : str, key : str, last_modified_field : str = None):
+        """
+        Perform an incremental update on existing data with new data.
+
+        Args:
+            new_data (pd.DataFrame): Incoming DataFrame with new or updated records.
+            table_name (str): Name of the table in the database that houses the existing data.
+            key (str): Column name to use as the unique identifier for matching.
+            last_modified_field (str, optional): Field name to determine the most recent changes.
+        
+        Returns:
+            pd.DataFrame: Updated DataFrame with new and modified records.
+        """
+        try:
+            # Get existing data from the database
+            existing_data = pd.read_sql(f'SELECT * FROM {table_name}', self.conn)
+            existing_data = existing_data.drop('etl_timestamp', axis=1)
+            # Merge new data with existing data based on the key
+            merged_data = pd.merge(existing_data, new_data, on=key, how='outer', suffixes=('_existing', '_new'))
+            # Determine which records to keep from new data
+            if last_modified_field:
+                merged_data[last_modified_field + '_new'] = pd.to_datetime(merged_data[last_modified_field + '_new'])
+                merged_data[last_modified_field + '_existing'] = pd.to_datetime(merged_data[last_modified_field + '_existing'])
+
+                # Use new data if it has a later last_modified timestamp
+                merged_data['use_new'] = (
+                    merged_data[last_modified_field + '_new'] > merged_data[last_modified_field + '_existing']
+                ) | merged_data[last_modified_field + '_existing'].isna()
+            else:
+                # If no last_modified field, prefer new data for non-matching rows
+                merged_data['use_new'] = merged_data.iloc[:,1].isna()                
+            # Apply updates: combine existing and new records
+            merged_data_new = merged_data.loc[merged_data['use_new']==True]
+            updated_data = merged_data_new.filter(regex='^id|_new$').rename(columns=lambda x: x.replace('_new', ''))
+            merged_data_old = merged_data.loc[merged_data['use_new']==False]
+            unchanged_data = merged_data_old.filter(regex='^id|_existing$').rename(columns=lambda x: x.replace('_existing', ''))
+            return pd.concat([updated_data, unchanged_data], ignore_index=True)
+        except Exception as e:
+            logger.error(f'Error performing incremental update: {e}')
             raise e
         
     def close_conn(self):
